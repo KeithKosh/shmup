@@ -24,9 +24,23 @@ let shadowOffset = 40;
 let bg = new Image();
 let sprite = new Image();
 
+let scrollSpeed = 1;
+
 let offsetY = 0;
 let playerX = 90;
 let playerY = 150;
+let moveSpeed = 1.5;
+
+let keyQueue = [];
+const KEY_LEFT = 37;
+const KEY_RIGHT = 39;
+const KEY_UP = 38;
+const KEY_DOWN = 40;
+const KEY_FIRE = 16;
+
+let bullets = [];
+let BULLET_COOLDOWN = 15;
+let bulletTime = 0;
 
 document.addEventListener('DOMContentLoaded', init, false);
 
@@ -57,6 +71,11 @@ function init() {
 	bgCanvas.height = gameHeight;
 	bgContext = bgCanvas.getContext('2d');
 
+	// add key listeners
+	document.addEventListener('keydown', keyDownHandler, false);
+	document.addEventListener('keyup', keyUpHandler, false);
+
+	// load images
 	sprite.src = 'images/sprite.png';
 	bg.src = 'images/water2.gif';
 	bg.onload = function() {
@@ -65,8 +84,12 @@ function init() {
 }
 
 function gameLoop() {
-	offsetY += 1;
-	if (offsetY >= tileSize) offsetY = 0;
+	// check keys and move sprites
+	moveSprites();
+
+	// advance scrolling
+	offsetY += scrollSpeed;
+	if (offsetY >= tileSize) offsetY = offsetY % tileSize;
 
 	drawTiles();
 	drawSprites();
@@ -84,6 +107,7 @@ function gameLoop() {
 	}
 	
 	// draw shadow map
+	shadowContext.globalCompositeOperation = 'source-over';
 	shadowContext.fillStyle = "#000080";
 	shadowContext.fillRect(0, 0, gameWidth / pixelScale, gameHeight / pixelScale);
 	shadowContext.globalCompositeOperation = 'destination-in';
@@ -114,6 +138,64 @@ function drawTiles() {
 }
 
 function drawSprites() {
-	// just one to start
-	spriteContext.drawImage(sprite, playerX, playerY);
+	spriteContext.clearRect(0, 0, gameWidth, gameHeight);
+
+	// player ship
+	spriteContext.drawImage(sprite, Math.round(playerX), Math.round(playerY));
+
+	// bullets
+	spriteContext.fillStyle = "#ffffff";
+	for (bulletCount = 0; bulletCount < bullets.length; bulletCount++) {
+		if (bullets[bulletCount].y <= 0) {
+			bullets.splice(bulletCount, 1);
+			bulletCount--;
+		} else {
+			spriteContext.fillRect(bullets[bulletCount].x, bullets[bulletCount].y, 1, 1);
+			bullets[bulletCount].y -= 5;
+		}
+	}
+}
+
+function moveSprites() {
+	if (keyQueue.indexOf(KEY_RIGHT) > -1) {
+		playerX += moveSpeed;
+	} else if (keyQueue.indexOf(KEY_LEFT) > -1) {
+		playerX -= moveSpeed;
+	}
+
+	if (playerX < 0) playerX = 0;
+	if (playerX > gameWidth / pixelScale - sprite.width) playerX = gameWidth / pixelScale - sprite.width;
+
+	if (keyQueue.indexOf(KEY_UP) > -1) {
+		playerY -= moveSpeed;
+	} else if (keyQueue.indexOf(KEY_DOWN) > -1) {
+		playerY += moveSpeed;
+	}
+
+	if (playerY < 0) playerY = 0;
+	if (playerY > gameHeight / pixelScale - sprite.height) playerY = gameHeight / pixelScale - sprite.height;
+
+
+	if (bulletTime > 0) bulletTime--;
+	if (keyQueue.indexOf(KEY_FIRE) > -1) {
+		if (bulletTime == 0) {
+			bullets.push({
+				x: Math.round(playerX + (sprite.width / 2)),
+				y: Math.round(playerY - 1)
+			});
+			bulletTime = BULLET_COOLDOWN;
+		}
+	}
+}
+
+function keyDownHandler(evt) {
+	if (keyQueue.indexOf(evt.keyCode) == -1) {
+		keyQueue.push(evt.keyCode);
+	}
+}
+
+function keyUpHandler(evt) {
+	if (keyQueue.indexOf(evt.keyCode) > -1) {
+		keyQueue.splice(keyQueue.indexOf(evt.keyCode), 1);
+	}
 }
