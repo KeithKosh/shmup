@@ -1,3 +1,5 @@
+import { Terrain } from "./terrain.js";
+
 /** SHMUP main script: loads fonts, external graphics, etc., sets up engine/canvas, runs game loop. **/
 
 //@TODO move these into an external settings file...
@@ -18,15 +20,23 @@ let spriteContext = null;
 let shadowCanvas = null;
 let shadowContext = null;
 
+let cloudsCanvas = null;
+let cloudsContext = null;
+
 let tileSize = 24;
 let shadowOffset = 40;
 
 let bg = new Image();
 let sprite = new Image();
 
+let clouds = [];
+let cloudsTerrain = null;
+let cloudsSize = 25;
+
 let scrollSpeed = 1;
 
 let offsetY = 0;
+let cloudsY = 0;
 let playerX = 90;
 let playerY = 150;
 let moveSpeed = 1.5;
@@ -71,9 +81,18 @@ function init() {
 	bgCanvas.height = gameHeight;
 	bgContext = bgCanvas.getContext('2d');
 
+	cloudsCanvas = document.createElement("canvas");
+	cloudsCanvas.width = gameWidth;
+	cloudsCanvas.height = gameHeight;
+	cloudsContext = cloudsCanvas.getContext('2d');
+
 	// add key listeners
 	document.addEventListener('keydown', keyDownHandler, false);
 	document.addEventListener('keyup', keyUpHandler, false);
+
+	// load clouds terrain
+	cloudsTerrain = new Terrain(Math.ceil(gameWidth / cloudsSize), Math.ceil(gameHeight / cloudsSize) + 1);
+	clouds = cloudsTerrain.generateMap();
 
 	// load images
 	sprite.src = 'images/sprite.png';
@@ -91,6 +110,12 @@ function gameLoop() {
 	offsetY += scrollSpeed;
 	if (offsetY >= tileSize) offsetY = offsetY % tileSize;
 
+	cloudsY += scrollSpeed * 3;
+	if (cloudsY >= cloudsSize) {
+		cloudsY = cloudsY % cloudsSize;
+		clouds = cloudsTerrain.newLine();
+	}
+
 	drawTiles();
 	drawSprites();
 
@@ -101,7 +126,7 @@ function gameLoop() {
 	let scaleDown = 0;
 	let scalePrecision = 10;
 	let scaleAmount = 3;
-	for (z = 0; z < gameHeight / pixelScale; z+= scalePrecision) {
+	for (let z = 0; z < gameHeight / pixelScale; z += scalePrecision) {
 		gameContext.drawImage(bgCanvas, 0, z, gameWidth / pixelScale, scalePrecision, 0 - (scaleDown / 2), z, gameWidth / pixelScale + scaleDown, scalePrecision);
 		scaleDown += scaleAmount;
 	}
@@ -124,14 +149,27 @@ function gameLoop() {
 	// draw sprites
 	gameContext.drawImage(spriteCanvas, 0, 0);
 
+	// draw clouds
+	cloudsContext.clearRect(0, 0, gameWidth, gameHeight);
+	cloudsContext.fillStyle = "#ffffff";
+	cloudsContext.globalAlpha = .1;
+	for (let rowCount = 0; rowCount < cloudsTerrain.dimensions().height; rowCount++) {
+		for (let colCount = 0; colCount < cloudsTerrain.dimensions().width; colCount++) {
+			if (clouds[rowCount].substring(colCount, colCount + 1) == 'X') {
+				cloudsContext.fillRect(colCount * cloudsSize, rowCount * cloudsSize - cloudsSize + cloudsY, cloudsSize, cloudsSize);
+			}
+		}
+	}
+	gameContext.drawImage(cloudsCanvas, 0, 0);
+
 	// draw HUD? todo
 
 	window.requestAnimationFrame(gameLoop);
 }
 
 function drawTiles() {
-	for (yCount = 0; yCount < Math.ceil((gameHeight + offsetY) / tileSize); yCount++) {
-		for (xCount = 0; xCount < Math.ceil(gameWidth / tileSize); xCount++) {
+	for (let yCount = 0; yCount < Math.ceil((gameHeight + offsetY) / tileSize); yCount++) {
+		for (let xCount = 0; xCount < Math.ceil(gameWidth / tileSize); xCount++) {
 			bgContext.drawImage(bg, xCount * tileSize, yCount * tileSize - (tileSize - offsetY));
 		}
 	}
@@ -145,7 +183,7 @@ function drawSprites() {
 
 	// bullets
 	spriteContext.fillStyle = "#ffffff";
-	for (bulletCount = 0; bulletCount < bullets.length; bulletCount++) {
+	for (let bulletCount = 0; bulletCount < bullets.length; bulletCount++) {
 		if (bullets[bulletCount].y <= 0) {
 			bullets.splice(bulletCount, 1);
 			bulletCount--;
