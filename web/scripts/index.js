@@ -4,10 +4,15 @@ import { Terrain } from "./terrain.js";
 
 //@TODO move these into an external settings file...
 
+let { ceil, floor, round } = Math;
+
 let gameWidth = 800;
 let gameHeight = 800;
 
 let pixelScale = 4;
+
+let domCanvas = null;
+let domContext = null;
 
 let gameCanvas = null;
 let gameContext = null;
@@ -56,15 +61,20 @@ document.addEventListener('DOMContentLoaded', init, false);
 
 function init() {
 	// Build game canvas
+	domCanvas = document.createElement("canvas");
+	domCanvas.id = "gameCanvas";
+	domCanvas.width = gameWidth;
+	domCanvas.height = gameHeight;
+	domContext = domCanvas.getContext('2d');
+	domContext.scale(pixelScale, pixelScale);
+	domContext.imageSmoothingEnabled = false;
+
+	document.body.appendChild(domCanvas);
+
 	gameCanvas = document.createElement("canvas");
-	gameCanvas.id = "gameCanvas";
 	gameCanvas.width = gameWidth;
 	gameCanvas.height = gameHeight;
 	gameContext = gameCanvas.getContext('2d');
-	gameContext.scale(4, 4);
-	gameContext.imageSmoothingEnabled = false;
-
-	document.body.appendChild(gameCanvas);
 
 	spriteCanvas = document.createElement("canvas");
 	spriteCanvas.width = gameWidth;
@@ -123,12 +133,29 @@ function gameLoop() {
 	gameContext.globalCompositeOperation = 'source-over';
 	gameContext.globalAlpha = 1;
 
-	let scaleDown = 0;
-	let scalePrecision = 10;
-	let scaleAmount = 3;
+	// Add perspective
+	let scalePrecision = tileSize / 2;
+	let scaleXAmount = 3.5;
+	let scaleYAmount = 0.1;
+	let scaleCount = 0;
+	let scaleX = 0;
+	let scaleY = 0;
 	for (let z = 0; z < gameHeight / pixelScale; z += scalePrecision) {
-		gameContext.drawImage(bgCanvas, 0, z, gameWidth / pixelScale, scalePrecision, 0 - (scaleDown / 2), z, gameWidth / pixelScale + scaleDown, scalePrecision);
-		scaleDown += scaleAmount;
+		//gameContext.drawImage(bgCanvas, 0, z, gameWidth / pixelScale, scaleYPrecision, 0 - (scaleY / 2), z + (scaleY * scaleCount), gameWidth / pixelScale + scaleX, scaleYPrecision + scaleCount, 25);
+		gameContext.drawImage(bgCanvas,
+			0,
+			z,
+			gameWidth / pixelScale,
+			scalePrecision,
+			0 - (scaleX / 2),
+			z + (scaleY * scaleCount),
+			round(gameWidth / pixelScale + scaleX),
+			round(scalePrecision + (scaleY * 2) + scaleYAmount)
+		);
+		scaleX += scaleXAmount;
+		scaleY += scaleYAmount;
+		scaleCount++;
+		if (z + (scaleY * scaleCount) >= gameHeight / pixelScale) break;
 	}
 	
 	// draw shadow map
@@ -150,9 +177,9 @@ function gameLoop() {
 	gameContext.drawImage(spriteCanvas, 0, 0);
 
 	// draw clouds
-	cloudsContext.clearRect(0, 0, gameWidth, gameHeight);
 	cloudsContext.fillStyle = "#ffffff";
-	cloudsContext.globalAlpha = .1;
+	cloudsContext.clearRect(0, 0, gameWidth, gameHeight);
+	
 	for (let rowCount = 0; rowCount < cloudsTerrain.dimensions().height; rowCount++) {
 		for (let colCount = 0; colCount < cloudsTerrain.dimensions().width; colCount++) {
 			if (clouds[rowCount].substring(colCount, colCount + 1) == 'X') {
@@ -160,9 +187,19 @@ function gameLoop() {
 			}
 		}
 	}
-	gameContext.drawImage(cloudsCanvas, 0, 0);
+
+	gameContext.save();
+
+	gameContext.globalCompositeOperation = 'lighter';
+	gameContext.globalAlpha = .05;
+	//gameContext.drawImage(cloudsCanvas, 0, 0);
+
+	gameContext.restore();
 
 	// draw HUD? todo
+
+	// finally copy completed canvas to screen
+	domContext.drawImage(gameCanvas, 0, 0);
 
 	window.requestAnimationFrame(gameLoop);
 }
